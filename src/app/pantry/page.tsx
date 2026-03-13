@@ -18,6 +18,7 @@ function EditIngredientSheet({
 }: {
   ing: Ingredient; members: FamilyMember[]; onClose: () => void; onSaved: () => void
 }) {
+  const [name, setName] = useState(ing.name)
   const [totalServings, setTotalServings] = useState(ing.totalServings || 0)
   const [whoEatsIt, setWhoEatsIt] = useState<string[]>(ing.whoEatsIt.length > 0 ? ing.whoEatsIt : [])
   const [expiryDate, setExpiryDate] = useState(
@@ -36,7 +37,7 @@ function EditIngredientSheet({
     await fetch(`/api/ingredients/${ing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ totalServings, whoEatsIt, status, expiryDate: expiryDate || null }),
+      body: JSON.stringify({ name, totalServings, whoEatsIt, status, expiryDate: expiryDate || null }),
     })
     setSaving(false)
     onSaved()
@@ -59,6 +60,14 @@ function EditIngredientSheet({
           </button>
         </div>
         <div className="px-5 py-5 space-y-5">
+          <div>
+            <label className="text-sm font-medium text-zinc-200 mb-2 block">Nome</label>
+            <input
+              className="input-field"
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+          </div>
           <div>
             <p className="text-sm font-medium text-zinc-200 mb-2">Stato</p>
             <div className="flex gap-2">
