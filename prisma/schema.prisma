@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = env("DATABASE_PROVIDER")
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -84,8 +84,4 @@ model PlannedMeal {
 
 model SuggestionLog {
   id                String   @id @default(cuid())
-  date              DateTime @default(now())
-  suggestionPayload String
-  accepted          Boolean  @default(false)
-  reason            String   @default("")
-}
+  date
