@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Ingredient, FamilyMember } from '@/lib/types'
 
 function getWeekDays() {
@@ -275,6 +276,7 @@ function MemberCard({
 }
 
 export default function PlannerPage() {
+  const router = useRouter()
   const [meals, setMeals] = useState<any[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [members, setMembers] = useState<FamilyMember[]>([])
@@ -337,7 +339,18 @@ export default function PlannerPage() {
   return (
     <div className="pb-4">
       <div className="px-4 pt-6 pb-3 sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
-        <h1 className="text-xl font-bold text-zinc-100 mb-4">Planner</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold text-zinc-100">Planner</h1>
+          <button
+            onClick={() => {
+              const dateStr = activeDay.toISOString().split('T')[0]
+              const slot = isWeekend(activeDay) ? 'dinner' : 'dinner'
+              router.push(`/planner/suggest?date=${dateStr}&slot=${slot}`)
+            }}
+            className="bg-amber-400 text-zinc-950 font-semibold text-sm px-3 py-1.5 rounded-xl active:scale-95 transition-transform">
+            Suggerisci
+          </button>
+        </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4">
           {week.map((d, i) => {
             const isToday = d.toDateString() === today.toDateString()
