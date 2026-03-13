@@ -49,39 +49,3 @@ model MealOption {
   compatibleMemberIds   String   @default("[]")
   requiredIngredientIds String   @default("[]")
   optionalIngredientIds String   @default("[]")
-  servingsAdults        Int      @default(2)
-  servingsChildren      Int      @default(2)
-  tags                  String   @default("[]")
-  canBeFrozen           Boolean  @default(false)
-  preparationNotes      String   @default("")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
-
-model PlanningRule {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  label       String
-  value       String
-  scope       String   @default("always")
-  active      Boolean  @default(true)
-  description String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model PlannedMeal {
-  id           String   @id @default(cuid())
-  date         DateTime
-  slot         String
-  memberGroup  String
-  mealOptionId String
-  overrides    String   @default("[]")
-  notes        String   @default("")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
-model SuggestionLog {
-  id                String   @id @default(cuid())
-  date
