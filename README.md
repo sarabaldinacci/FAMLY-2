@@ -15,7 +15,7 @@
 4. Clicca **"Create repository"**
 
 ### 1.3 — Carica il codice
-1. Nella pagina del repository appena creato, clicca **"uploading an existing file"**
+1. Nella pagina del repository appena creato,  clicca **"uploading an existing file"** ok
 2. Trascina dentro TUTTI i file e le cartelle dalla cartella `famly/` che ti ho dato
 3. Scrivi come messaggio: `primo caricamento`
 4. Clicca **"Commit changes"**
