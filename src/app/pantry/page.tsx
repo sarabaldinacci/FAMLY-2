@@ -11,46 +11,32 @@ const FILTERS = [
   { key: 'freezer', label: 'Freezer' },
   { key: 'pantry', label: 'Dispensa' },
 ] as const
-
 type FilterKey = typeof FILTERS[number]['key']
 
-// ─── Servings Picker ────────────────────────────────────────────────────────
-// Il componente chiave: "ho comprato 3 porzioni di petto di pollo, lo mangiano Sara, Diego, Bianca"
-
-function ServingsPickerSheet({
-  ing,
-  members,
-  onClose,
-  onSaved,
+function EditIngredientSheet({
+  ing, members, onClose, onSaved,
 }: {
-  ing: Ingredient
-  members: FamilyMember[]
-  onClose: () => void
-  onSaved: () => void
+  ing: Ingredient; members: FamilyMember[]; onClose: () => void; onSaved: () => void
 }) {
   const [totalServings, setTotalServings] = useState(ing.totalServings || 0)
-  const [whoEatsIt, setWhoEatsIt] = useState<string[]>(
-    ing.whoEatsIt.length > 0 ? ing.whoEatsIt : []
+  const [whoEatsIt, setWhoEatsIt] = useState<string[]>(ing.whoEatsIt.length > 0 ? ing.whoEatsIt : [])
+  const [expiryDate, setExpiryDate] = useState(
+    ing.expiryDate ? new Date(ing.expiryDate).toISOString().split('T')[0] : ''
   )
+  const [status, setStatus] = useState(ing.status)
   const [saving, setSaving] = useState(false)
 
-  const toggleMember = (id: string) => {
-    setWhoEatsIt(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
-  }
+  const toggleMember = (id: string) =>
+    setWhoEatsIt(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
-  const info = calcServingsInfo(
-    { ...ing, totalServings, whoEatsIt },
-    members
-  )
+  const info = calcServingsInfo({ ...ing, totalServings, whoEatsIt }, members)
 
   const save = async () => {
     setSaving(true)
     await fetch(`/api/ingredients/${ing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ totalServings, whoEatsIt }),
+      body: JSON.stringify({ totalServings, whoEatsIt, status, expiryDate: expiryDate || null }),
     })
     setSaving(false)
     onSaved()
@@ -60,11 +46,11 @@ function ServingsPickerSheet({
   return (
     <>
       <div className="sheet-overlay" onClick={onClose} />
-      <div className="sheet">
+      <div className="sheet max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
             <h2 className="font-bold text-zinc-100">{ing.name}</h2>
-            <p className="text-xs text-zinc-500">Porzioni acquistate</p>
+            <p className="text-xs text-zinc-500">Modifica dettagli</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 p-1">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -72,63 +58,75 @@ function ServingsPickerSheet({
             </svg>
           </button>
         </div>
-
         <div className="px-5 py-5 space-y-5">
-          {/* Numero porzioni */}
           <div>
-            <label className="text-sm font-medium text-zinc-200 mb-3 block">
-              Quante porzioni hai comprato?
-            </label>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setTotalServings(Math.max(0, totalServings - 1))}
-                className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-xl text-zinc-300 active:bg-zinc-700 transition-colors font-light">
-                −
-              </button>
-              <span className="text-3xl font-bold text-zinc-100 w-12 text-center tabular-nums">
-                {totalServings}
-              </span>
-              <button
-                onClick={() => setTotalServings(totalServings + 1)}
-                className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-xl text-zinc-300 active:bg-zinc-700 transition-colors font-light">
-                +
-              </button>
-              <span className="text-sm text-zinc-500 ml-1">porzioni</span>
+            <p className="text-sm font-medium text-zinc-200 mb-2">Stato</p>
+            <div className="flex gap-2">
+              {(['closed', 'opened', 'urgent', 'consumed'] as const).map(s => (
+                <button key={s} onClick={() => setStatus(s)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                    status === s
+                      ? s === 'urgent' ? 'bg-red-500/30 border-red-500/60 text-red-300'
+                        : s === 'opened' ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : s === 'consumed' ? 'bg-zinc-600 border-zinc-500 text-zinc-300'
+                        : 'bg-zinc-600 border-zinc-500 text-zinc-200'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-500'
+                  }`}>
+                  {STATUS_LABELS[s]}
+                </button>
+              ))}
             </div>
-            <p className="text-xs text-zinc-600 mt-2">
-              Es: hai comprato 3 petti di pollo → 3 porzioni
-            </p>
           </div>
 
-          {/* Chi lo mangia */}
           <div>
-            <label className="text-sm font-medium text-zinc-200 mb-3 block">
-              Chi lo mangia?
-            </label>
+            <label className="text-sm font-medium text-zinc-200 mb-2 block">Data scadenza</label>
+            <input
+              type="date"
+              value={expiryDate}
+              onChange={e => setExpiryDate(e.target.value)}
+              className="input-field"
+              style={{ colorScheme: 'dark' }}
+            />
+            {expiryDate && (() => {
+              const diff = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / 86400000)
+              return (
+                <p className={`text-xs mt-1.5 ${diff <= 2 ? 'text-red-400' : diff <= 5 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                  {diff < 0 ? 'Scaduto' : diff === 0 ? 'Scade oggi' : `Scade tra ${diff} giorni`}
+                </p>
+              )
+            })()}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-zinc-200 mb-3 block">Porzioni acquistate</label>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setTotalServings(Math.max(0, totalServings - 1))}
+                className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-xl text-zinc-300 active:bg-zinc-700 font-light">−</button>
+              <span className="text-3xl font-bold text-zinc-100 w-12 text-center tabular-nums">{totalServings}</span>
+              <button onClick={() => setTotalServings(totalServings + 1)}
+                className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-xl text-zinc-300 active:bg-zinc-700 font-light">+</button>
+              <span className="text-sm text-zinc-500 ml-1">porzioni</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-zinc-200 mb-3 block">Chi lo mangia?</label>
             <div className="grid grid-cols-2 gap-2">
               {members.map(m => {
                 const selected = whoEatsIt.includes(m.id)
                 return (
-                  <button
-                    key={m.id}
-                    onClick={() => toggleMember(m.id)}
+                  <button key={m.id} onClick={() => toggleMember(m.id)}
                     className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-colors text-left ${
-                      selected
-                        ? 'bg-amber-400/20 border-amber-400/60 text-amber-300'
-                        : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                      selected ? 'bg-amber-400/20 border-amber-400/60 text-amber-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400'
                     }`}>
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${
-                      selected
-                        ? 'bg-amber-400 text-zinc-950'
-                        : m.type === 'adult' ? 'bg-zinc-700 text-zinc-400' : 'bg-zinc-700 text-zinc-400'
+                      selected ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-700 text-zinc-400'
                     }`}>
                       {m.type === 'adult' ? '🧑' : '👶'}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium leading-tight">{m.name}</p>
-                      <p className="text-[10px] leading-tight opacity-60">
-                        {m.type === 'adult' ? 'Adulto' : 'Bambino'}
-                      </p>
+                      <p className="text-[10px] leading-tight opacity-60">{m.type === 'adult' ? 'Adulto' : 'Bambino'}</p>
                     </div>
                   </button>
                 )
@@ -136,10 +134,9 @@ function ServingsPickerSheet({
             </div>
           </div>
 
-          {/* Preview calcolo */}
           {totalServings > 0 && whoEatsIt.length > 0 && (
             <div className="bg-zinc-800 rounded-xl px-4 py-3">
-              <p className="text-xs text-zinc-500 mb-1">Risultato</p>
+              <p className="text-xs text-zinc-500 mb-1">Cene stimate</p>
               <p className="text-sm font-semibold text-amber-400">
                 {info.mealsCount} {info.mealsCount === 1 ? 'cena' : 'cene'}
               </p>
@@ -147,11 +144,8 @@ function ServingsPickerSheet({
             </div>
           )}
 
-          <button
-            onClick={save}
-            disabled={saving}
-            className="btn-primary w-full">
-            {saving ? 'Salvo...' : 'Salva porzioni'}
+          <button onClick={save} disabled={saving} className="btn-primary w-full">
+            {saving ? 'Salvo...' : 'Salva modifiche'}
           </button>
         </div>
       </div>
@@ -159,19 +153,11 @@ function ServingsPickerSheet({
   )
 }
 
-// ─── Ingredient Card ─────────────────────────────────────────────────────────
-
-function IngredientCard({
-  ing,
-  members,
-  onUpdate,
-}: {
-  ing: Ingredient
-  members: FamilyMember[]
-  onUpdate: () => void
+function IngredientCard({ ing, members, onUpdate }: {
+  ing: Ingredient; members: FamilyMember[]; onUpdate: () => void
 }) {
   const [updating, setUpdating] = useState(false)
-  const [showServings, setShowServings] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   const setStatus = async (status: string) => {
     setUpdating(true)
@@ -184,12 +170,12 @@ function IngredientCard({
     setUpdating(false)
   }
 
-  const servingsInfo = ing.totalServings > 0
-    ? calcServingsInfo(ing, members)
-    : null
-
+  const servingsInfo = ing.totalServings > 0 ? calcServingsInfo(ing, members) : null
   const eaterNames = ing.whoEatsIt.length > 0
     ? ing.whoEatsIt.map(id => members.find(m => m.id === id)?.name).filter(Boolean).join(', ')
+    : null
+  const expiryDiff = ing.expiryDate
+    ? Math.ceil((new Date(ing.expiryDate).getTime() - Date.now()) / 86400000)
     : null
 
   return (
@@ -203,25 +189,16 @@ function IngredientCard({
                 <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
               )}
             </div>
-
             <div className="flex flex-wrap gap-1 mt-1.5">
-              <span className={`badge ${STORAGE_COLOR[ing.storageType]}`}>
-                {STORAGE_LABELS[ing.storageType]}
-              </span>
-              <span className="badge bg-zinc-800 text-zinc-400">
-                {CATEGORY_LABELS[ing.category]}
-              </span>
+              <span className={`badge ${STORAGE_COLOR[ing.storageType]}`}>{STORAGE_LABELS[ing.storageType]}</span>
+              <span className="badge bg-zinc-800 text-zinc-400">{CATEGORY_LABELS[ing.category]}</span>
               {ing.perishabilityScore > 60 && (
                 <span className={`badge ${PERISHABILITY_COLOR(ing.perishabilityScore)}`}>
                   {PERISHABILITY_LABEL(ing.perishabilityScore)} deperibilità
                 </span>
               )}
-              <span className={`badge border ${STATUS_COLOR[ing.status]}`}>
-                {STATUS_LABELS[ing.status]}
-              </span>
+              <span className={`badge border ${STATUS_COLOR[ing.status]}`}>{STATUS_LABELS[ing.status]}</span>
             </div>
-
-            {/* Servings info */}
             {servingsInfo && (
               <div className="mt-2 bg-zinc-800/60 rounded-lg px-2.5 py-1.5">
                 <p className="text-xs font-semibold text-amber-400">
@@ -230,111 +207,87 @@ function IngredientCard({
                 <p className="text-[11px] text-zinc-500">{servingsInfo.description}</p>
               </div>
             )}
-
-            {!servingsInfo && ing.category === 'protein' && (
-              <button
-                onClick={() => setShowServings(true)}
-                className="mt-2 text-xs text-amber-400/70 underline underline-offset-2">
-                + Aggiungi porzioni
-              </button>
-            )}
-
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500 flex-wrap">
               <span>{ing.quantity} {ing.unit}</span>
               {eaterNames && <><span>·</span><span>{eaterNames}</span></>}
-              {ing.expiryDate && (
+              {expiryDiff !== null && (
                 <>
                   <span>·</span>
-                  <span className={new Date(ing.expiryDate) < new Date(Date.now() + 3 * 86400000) ? 'text-red-400' : ''}>
-                    Scade {new Date(ing.expiryDate).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                  <span className={expiryDiff <= 2 ? 'text-red-400 font-medium' : expiryDiff <= 5 ? 'text-amber-400' : ''}>
+                    {expiryDiff < 0 ? 'Scaduto' : expiryDiff === 0 ? 'Scade oggi' : `Scade tra ${expiryDiff}gg`}
                   </span>
                 </>
               )}
             </div>
-
-            {ing.consumeInOneSession && (
-              <p className="text-xs text-amber-400/80 mt-1">Da finire in un solo pasto</p>
-            )}
           </div>
-
-          {/* Edit servings button */}
-          <button
-            onClick={() => setShowServings(true)}
-            className="text-zinc-600 active:text-amber-400 p-1.5 transition-colors flex-shrink-0"
-            title="Modifica porzioni">
+          <button onClick={() => setShowEdit(true)}
+            className="text-zinc-600 active:text-amber-400 p-1.5 transition-colors flex-shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </button>
         </div>
 
-        {/* Quick status actions */}
         <div className="flex gap-2 mt-3">
           {ing.status === 'closed' && (
-            <button onClick={() => setStatus('opened')} disabled={updating}
-              className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 active:bg-amber-500/30 transition-colors">
-              Segna aperto
-            </button>
+            <>
+              <button onClick={() => setStatus('opened')} disabled={updating}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 active:bg-amber-500/30 transition-colors">
+                Aperto
+              </button>
+              <button onClick={() => setStatus('urgent')} disabled={updating}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 active:bg-red-500/30 transition-colors">
+                Urgente
+              </button>
+            </>
           )}
-          {(ing.status === 'opened' || ing.status === 'urgent') && (
+          {ing.status === 'opened' && (
+            <>
+              <button onClick={() => setStatus('urgent')} disabled={updating}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 active:bg-red-500/30 transition-colors">
+                Urgente
+              </button>
+              <button onClick={() => setStatus('consumed')} disabled={updating}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-zinc-800 text-zinc-400 active:bg-zinc-700 transition-colors">
+                Finito
+              </button>
+            </>
+          )}
+          {ing.status === 'urgent' && (
             <button onClick={() => setStatus('consumed')} disabled={updating}
               className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-zinc-800 text-zinc-400 active:bg-zinc-700 transition-colors">
               Finito
             </button>
           )}
-          {ing.status === 'closed' && (
-            <button onClick={() => setStatus('urgent')} disabled={updating}
-              className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 active:bg-red-500/30 transition-colors">
-              Urgente
-            </button>
-          )}
         </div>
       </div>
-
-      {showServings && (
-        <ServingsPickerSheet
-          ing={ing}
-          members={members}
-          onClose={() => setShowServings(false)}
-          onSaved={onUpdate}
-        />
+      {showEdit && (
+        <EditIngredientSheet ing={ing} members={members} onClose={() => setShowEdit(false)} onSaved={onUpdate} />
       )}
     </>
   )
 }
 
-// ─── Add Ingredient Sheet ────────────────────────────────────────────────────
-
-function AddIngredientSheet({
-  members,
-  onClose,
-  onAdded,
-}: {
-  members: FamilyMember[]
-  onClose: () => void
-  onAdded: () => void
+function AddIngredientSheet({ members, onClose, onAdded }: {
+  members: FamilyMember[]; onClose: () => void; onAdded: () => void
 }) {
   const [form, setForm] = useState({
     name: '', category: 'protein', storageType: 'fresh',
     quantity: 1, unit: 'pz', perishabilityScore: 50,
-    status: 'closed', servingsAdults: 2, servingsChildren: 2,
-    totalServings: 0, whoEatsIt: [] as string[],
-    consumeInOneSession: false, notes: '',
+    status: 'closed', totalServings: 0, whoEatsIt: [] as string[],
+    expiryDate: '', consumeInOneSession: false, notes: '',
   })
   const [saving, setSaving] = useState(false)
 
-  const toggleMember = (id: string) => {
+  const toggleMember = (id: string) =>
     setForm(f => ({
       ...f,
-      whoEatsIt: f.whoEatsIt.includes(id)
-        ? f.whoEatsIt.filter(x => x !== id)
-        : [...f.whoEatsIt, id],
+      whoEatsIt: f.whoEatsIt.includes(id) ? f.whoEatsIt.filter(x => x !== id) : [...f.whoEatsIt, id],
     }))
-  }
 
   const preview = form.totalServings > 0 && form.whoEatsIt.length > 0
     ? calcServingsInfo(
-        { ...form, id: '', name: form.name, category: form.category as any, storageType: form.storageType as any, status: form.status as any, allowedMemberIds: [], excludedMemberIds: [], expiryDate: null, purchaseDate: null, createdAt: '', updatedAt: '' },
+        { ...form, id: '', name: form.name, category: form.category as any, storageType: form.storageType as any, status: form.status as any, allowedMemberIds: [], excludedMemberIds: [], expiryDate: form.expiryDate || null, purchaseDate: null, createdAt: '', updatedAt: '', servingsAdults: 0, servingsChildren: 0 },
         members
       )
     : null
@@ -345,7 +298,7 @@ function AddIngredientSheet({
     await fetch('/api/ingredients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, allowedMemberIds: [], excludedMemberIds: [] }),
+      body: JSON.stringify({ ...form, expiryDate: form.expiryDate || null, allowedMemberIds: [], excludedMemberIds: [] }),
     })
     setSaving(false)
     onAdded()
@@ -393,8 +346,23 @@ function AddIngredientSheet({
               </select>
             </div>
           </div>
-
-          {/* Porzioni — sezione chiave */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Stato iniziale</label>
+              <select className="select-field" value={form.status}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="closed">Chiuso</option>
+                <option value="opened">Aperto</option>
+                <option value="urgent">Urgente</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Data scadenza</label>
+              <input type="date" className="input-field" value={form.expiryDate}
+                style={{ colorScheme: 'dark' }}
+                onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
+            </div>
+          </div>
           <div className="bg-zinc-800/50 rounded-xl p-4 space-y-3">
             <p className="text-sm font-medium text-zinc-200">Porzioni acquistate</p>
             <div className="flex items-center gap-4">
@@ -405,7 +373,6 @@ function AddIngredientSheet({
                 className="w-10 h-10 rounded-xl bg-zinc-700 flex items-center justify-center text-lg text-zinc-300 active:bg-zinc-600">+</button>
               <span className="text-sm text-zinc-500">porzioni</span>
             </div>
-
             {form.totalServings > 0 && (
               <>
                 <p className="text-xs text-zinc-500">Chi lo mangia?</p>
@@ -432,7 +399,6 @@ function AddIngredientSheet({
               </>
             )}
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Quantità</label>
@@ -445,34 +411,6 @@ function AddIngredientSheet({
                 onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
             </div>
           </div>
-
-          <div>
-            <label className="text-xs text-zinc-500 mb-1 block">Stato</label>
-            <select className="select-field" value={form.status}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="closed">Chiuso</option>
-              <option value="opened">Aperto</option>
-              <option value="urgent">Urgente</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs text-zinc-500 mb-1 block">
-              Deperibilità: {form.perishabilityScore < 40 ? 'Bassa' : form.perishabilityScore < 70 ? 'Media' : 'Alta'}
-            </label>
-            <input type="range" min="0" max="100" value={form.perishabilityScore}
-              className="w-full accent-amber-400"
-              onChange={e => setForm(f => ({ ...f, perishabilityScore: parseInt(e.target.value) }))} />
-          </div>
-
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className={`w-10 h-6 rounded-full transition-colors relative ${form.consumeInOneSession ? 'bg-amber-400' : 'bg-zinc-700'}`}
-              onClick={() => setForm(f => ({ ...f, consumeInOneSession: !f.consumeInOneSession }))}>
-              <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${form.consumeInOneSession ? 'translate-x-5' : 'translate-x-1'}`} />
-            </div>
-            <span className="text-sm text-zinc-300">Va finito in un solo pasto</span>
-          </label>
-
           <button onClick={save} disabled={saving || !form.name.trim()} className="btn-primary w-full">
             {saving ? 'Salvo...' : 'Aggiungi ingrediente'}
           </button>
@@ -481,8 +419,6 @@ function AddIngredientSheet({
     </>
   )
 }
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PantryPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
@@ -539,7 +475,6 @@ export default function PantryPage() {
           ))}
         </div>
       </div>
-
       <div className="px-4 space-y-2 mt-2">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -555,10 +490,7 @@ export default function PantryPage() {
           ))
         )}
       </div>
-
-      {showAdd && (
-        <AddIngredientSheet members={members} onClose={() => setShowAdd(false)} onAdded={load} />
-      )}
+      {showAdd && <AddIngredientSheet members={members} onClose={() => setShowAdd(false)} onAdded={load} />}
     </div>
   )
 }
