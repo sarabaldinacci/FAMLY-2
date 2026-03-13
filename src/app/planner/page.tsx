@@ -54,9 +54,37 @@ function PickIngredientSheet({
   const [selected, setSelected] = useState('')
   const [saving, setSaving] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickName, setQuickName] = useState('')
+  const [quickCategory, setQuickCategory] = useState('protein')
+  const [quickStorage, setQuickStorage] = useState('fresh')
+  const [addingNew, setAddingNew] = useState(false)
 
   const suggested = ingredients.filter(i => CAT_FOR_PORTATA[portata].includes(i.category))
-  const list = showAll ? ingredients : suggested
+  const list = showAll ? ingredients : (suggested.length > 0 ? suggested : ingredients)
+
+  const saveQuickAdd = async () => {
+    if (!quickName.trim()) return
+    setAddingNew(true)
+    const res = await fetch('/api/ingredients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: quickName.trim(),
+        category: quickCategory,
+        storageType: quickStorage,
+        quantity: 1, unit: 'pz', perishabilityScore: 50,
+        status: 'closed', totalServings: 0, whoEatsIt: [],
+        allowedMemberIds: [], excludedMemberIds: [],
+      }),
+    })
+    const newIng = await res.json()
+    setAddingNew(false)
+    setShowQuickAdd(false)
+    setQuickName('')
+    setSelected(newIng.id)
+    onSaved() // ricarica lista ingredienti
+  }
 
   const save = async () => {
     if (!selected) return
@@ -130,7 +158,51 @@ function PickIngredientSheet({
           ))}
         </div>
 
-        <div className="px-5 pb-6 pt-3">
+        {showQuickAdd ? (
+          <div className="px-5 pb-4 pt-2 border-t border-zinc-800 space-y-3">
+            <p className="text-xs font-semibold text-zinc-400">Nuovo ingrediente</p>
+            <input
+              className="input-field"
+              placeholder="Nome (es. Pesce spada)"
+              value={quickName}
+              onChange={e => setQuickName(e.target.value)}
+              autoFocus
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <select className="select-field" value={quickCategory} onChange={e => setQuickCategory(e.target.value)}>
+                <option value="protein">Proteina</option>
+                <option value="side">Contorno</option>
+                <option value="primo">Primo</option>
+                <option value="sauce">Sugo</option>
+                <option value="dairy">Latticino</option>
+                <option value="jolly">Jolly</option>
+              </select>
+              <select className="select-field" value={quickStorage} onChange={e => setQuickStorage(e.target.value)}>
+                <option value="fresh">Fresco</option>
+                <option value="freezer">Freezer</option>
+                <option value="pantry">Dispensa</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowQuickAdd(false)} className="flex-1 py-2 rounded-xl bg-zinc-800 text-zinc-400 text-sm">
+                Annulla
+              </button>
+              <button onClick={saveQuickAdd} disabled={!quickName.trim() || addingNew}
+                className="flex-1 py-2 rounded-xl bg-amber-400 text-zinc-950 font-semibold text-sm disabled:opacity-40">
+                {addingNew ? 'Salvo...' : 'Aggiungi'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 pb-2 pt-1">
+            <button onClick={() => setShowQuickAdd(true)}
+              className="w-full py-2.5 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-sm active:border-amber-400 active:text-amber-400 transition-colors">
+              + Aggiungi nuovo ingrediente
+            </button>
+          </div>
+        )}
+
+        <div className="px-5 pb-6 pt-2">
           <button onClick={save} disabled={!selected || saving} className="btn-primary w-full disabled:opacity-40">
             {saving ? 'Salvo...' : 'Conferma'}
           </button>
