@@ -25,6 +25,9 @@ const PORTATE = [
 ] as const
 type Portata = typeof PORTATE[number]['key']
 
+// Un pasto pianificato = membro + slot + portata + ingrediente
+// Usiamo: memberGroup=memberId, notes=portata, mealOptionId=ingredientId
+
 const CAT_FOR_PORTATA: Record<Portata, string[]> = {
   primo: ['primo', 'sauce', 'jolly'],
   secondo: ['protein', 'dairy', 'jolly'],
@@ -32,17 +35,28 @@ const CAT_FOR_PORTATA: Record<Portata, string[]> = {
 }
 
 function PickIngredientSheet({
-  member, portata, slot, date, ingredients, onClose, onSaved,
+  member,
+  portata,
+  slot,
+  date,
+  ingredients,
+  onClose,
+  onSaved,
 }: {
-  member: FamilyMember; portata: Portata; slot: string; date: Date
-  ingredients: Ingredient[]; onClose: () => void; onSaved: () => void
+  member: FamilyMember
+  portata: Portata
+  slot: string
+  date: Date
+  ingredients: Ingredient[]
+  onClose: () => void
+  onSaved: () => void
 }) {
   const [selected, setSelected] = useState('')
   const [saving, setSaving] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
   const suggested = ingredients.filter(i => CAT_FOR_PORTATA[portata].includes(i.category))
-  const list = showAll ? ingredients : (suggested.length > 0 ? suggested : ingredients)
+  const list = showAll ? ingredients : suggested
 
   const save = async () => {
     if (!selected) return
@@ -70,9 +84,7 @@ function PickIngredientSheet({
       <div className="sheet">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
-            <h2 className="font-bold text-zinc-100">
-              {member.name} — {PORTATE.find(p => p.key === portata)?.label}
-            </h2>
+            <h2 className="font-bold text-zinc-100">{member.name} — {PORTATE.find(p => p.key === portata)?.label}</h2>
             <p className="text-xs text-zinc-500">{slot === 'dinner' ? 'Cena' : 'Pranzo'}</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 p-1">
@@ -112,7 +124,7 @@ function PickIngredientSheet({
                 </span>
               </div>
               {ing.totalServings > 0 && (
-                <p className="text-xs text-zinc-600 mt-0.5">{ing.totalServings} porzioni</p>
+                <p className="text-xs text-zinc-600 mt-0.5">{ing.totalServings} porzioni rimaste</p>
               )}
             </button>
           ))}
@@ -129,13 +141,26 @@ function PickIngredientSheet({
 }
 
 function MemberCard({
-  member, date, slot, meals, ingredients, onRemove, onAdd,
+  member,
+  date,
+  slot,
+  meals,
+  ingredients,
+  onRemove,
+  onAdd,
 }: {
-  member: FamilyMember; date: Date; slot: string; meals: any[]
-  ingredients: Ingredient[]; onRemove: (id: string) => void; onAdd: (portata: Portata) => void
+  member: FamilyMember
+  date: Date
+  slot: string
+  meals: any[]
+  ingredients: Ingredient[]
+  onRemove: (id: string) => void
+  onAdd: (portata: Portata) => void
 }) {
   const myMeals = meals.filter(m => m.memberGroup === member.id && m.slot === slot)
+
   const getIngName = (id: string) => ingredients.find(i => i.id === id)?.name ?? id
+
   const portataMap: Record<string, any> = {}
   myMeals.forEach(m => { if (m.notes) portataMap[m.notes] = m })
 
@@ -147,17 +172,17 @@ function MemberCard({
         </div>
         <p className="text-sm font-bold text-zinc-100">{member.name}</p>
       </div>
+
       <div className="space-y-2">
         {PORTATE.map(({ key, label }) => {
           const meal = portataMap[key]
           return (
-            <div key={key} className="flex items-center gap-3">
+            <div key={key} className="flex items-center justify-between">
               <span className="text-xs text-zinc-600 w-16 flex-shrink-0">{label}</span>
               {meal ? (
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm text-zinc-200 flex-1 truncate">{getIngName(meal.mealOptionId)}</span>
-                  <button onClick={() => onRemove(meal.id)}
-                    className="text-zinc-700 active:text-red-400 transition-colors p-0.5 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-sm text-zinc-200 flex-1">{getIngName(meal.mealOptionId)}</span>
+                  <button onClick={() => onRemove(meal.id)} className="text-zinc-700 active:text-red-400 transition-colors p-0.5">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -218,6 +243,7 @@ export default function PlannerPage() {
   }
 
   const dayMeals = getMealsForDay(activeDay)
+  const hasMealsOnDay = (d: Date) => getMealsForDay(d).length > 0
 
   const renderSlot = (slot: string) => (
     <div className="space-y-2">
@@ -244,7 +270,6 @@ export default function PlannerPage() {
           {week.map((d, i) => {
             const isToday = d.toDateString() === today.toDateString()
             const isActive = d.toDateString() === activeDay.toDateString()
-            const hasMeals = getMealsForDay(d).length > 0
             return (
               <button key={i} onClick={() => setSelectedDay(d)}
                 className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-colors ${
@@ -254,7 +279,7 @@ export default function PlannerPage() {
                 }`}>
                 <span className="text-[10px] font-medium">{DAY_SHORT[i]}</span>
                 <span className="text-sm font-bold">{d.getDate()}</span>
-                {hasMeals && (
+                {hasMealsOnDay(d) && (
                   <div className={`w-1 h-1 rounded-full mt-0.5 ${isActive ? 'bg-zinc-950' : 'bg-amber-400'}`} />
                 )}
               </button>
