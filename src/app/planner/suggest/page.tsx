@@ -163,17 +163,26 @@ function SuggestContent() {
       PORTATE.forEach(p => {
         const key = `${s.memberId}-${p}`
         if (accepted[key] && s[p]) {
+          const ing = s[p]!
           promises.push(fetch('/api/planned-meals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               date, slot: slotParam,
               memberGroup: s.memberId,
-              mealOptionId: s[p]!.id,
+              mealOptionId: ing.id,
               notes: p,
               overrides: [],
             }),
           }))
+          // Scala porzioni
+          if (ing.totalServings > 0) {
+            promises.push(fetch(`/api/ingredients/${ing.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ totalServings: Math.max(0, ing.totalServings - 1) }),
+            }))
+          }
         }
       })
     })
