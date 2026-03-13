@@ -390,7 +390,6 @@ export function getUnusedOpenIngredients(
   return ingredients.filter(
     (i) =>
       (i.status === 'opened' || i.status === 'urgent') &&
-      !usedIngredientIds.has(i.id) &&
-      i.status !== 'consumed'
+      !usedIngredientIds.has(i.id)
   )
 }
