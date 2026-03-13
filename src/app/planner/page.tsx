@@ -3,14 +3,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Ingredient, FamilyMember } from '@/lib/types'
 
-function getWeekDays() {
+function getDays(startOffset: number): Date[] {
   const today = new Date()
-  const day = today.getDay()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1))
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
+  today.setHours(0, 0, 0, 0)
+  return Array.from({ length: 10 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(today.getDate() + startOffset + i)
     return d
   })
 }
@@ -90,6 +88,8 @@ function PickIngredientSheet({
   const save = async () => {
     if (!selected) return
     setSaving(true)
+
+    // Salva il pasto pianificato
     await fetch('/api/planned-meals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,6 +102,17 @@ function PickIngredientSheet({
         overrides: [],
       }),
     })
+
+    // Scala le porzioni dell'ingrediente (-1)
+    const ing = ingredients.find(i => i.id === selected)
+    if (ing && ing.totalServings > 0) {
+      await fetch(`/api/ingredients/${selected}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totalServings: Math.max(0, ing.totalServings - 1) }),
+      })
+    }
+
     setSaving(false)
     onSaved()
     onClose()
@@ -283,14 +294,16 @@ export default function PlannerPage() {
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [picking, setPicking] = useState<{ member: FamilyMember; portata: Portata; slot: string } | null>(null)
+  const [dayOffset, setDayOffset] = useState(0)
 
-  const week = getWeekDays()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const days = getDays(dayOffset)
 
   const load = useCallback(async () => {
-    const from = week[0].toISOString().split('T')[0]
-    const to = week[6].toISOString().split('T')[0]
+    const allDays = getDays(dayOffset)
+    const from = allDays[0].toISOString().split('T')[0]
+    const to = allDays[allDays.length - 1].toISOString().split('T')[0]
     const [planned, ings, mems] = await Promise.all([
       fetch(`/api/planned-meals?from=${from}&to=${to}`).then(r => r.json()),
       fetch('/api/ingredients').then(r => r.json()),
@@ -300,7 +313,7 @@ export default function PlannerPage() {
     setIngredients(Array.isArray(ings) ? ings.filter((i: Ingredient) => i.status !== 'consumed') : [])
     setMembers(Array.isArray(mems) ? mems : [])
     setLoading(false)
-  }, [])
+  }, [dayOffset])
 
   useEffect(() => { load() }, [load])
 
@@ -344,32 +357,52 @@ export default function PlannerPage() {
           <button
             onClick={() => {
               const dateStr = activeDay.toISOString().split('T')[0]
-              const slot = isWeekend(activeDay) ? 'dinner' : 'dinner'
-              router.push(`/planner/suggest?date=${dateStr}&slot=${slot}`)
+              router.push(`/planner/suggest?date=${dateStr}&slot=dinner`)
             }}
             className="bg-amber-400 text-zinc-950 font-semibold text-sm px-3 py-1.5 rounded-xl active:scale-95 transition-transform">
             Suggerisci
           </button>
         </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4">
-          {week.map((d, i) => {
-            const isToday = d.toDateString() === today.toDateString()
-            const isActive = d.toDateString() === activeDay.toDateString()
-            return (
-              <button key={i} onClick={() => setSelectedDay(d)}
-                className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-colors ${
-                  isActive ? 'bg-amber-400 text-zinc-950' :
-                  isToday ? 'bg-zinc-800 text-amber-400 border border-amber-400/30' :
-                  'bg-zinc-800 text-zinc-400'
-                }`}>
-                <span className="text-[10px] font-medium">{DAY_SHORT[i]}</span>
-                <span className="text-sm font-bold">{d.getDate()}</span>
-                {hasMealsOnDay(d) && (
-                  <div className={`w-1 h-1 rounded-full mt-0.5 ${isActive ? 'bg-zinc-950' : 'bg-amber-400'}`} />
-                )}
-              </button>
-            )
-          })}
+
+        {/* Navigazione giorni */}
+        <div className="flex items-center gap-2 mb-1">
+          <button
+            onClick={() => { setDayOffset(o => Math.max(0, o - 10)); setSelectedDay(null) }}
+            disabled={dayOffset === 0}
+            className="text-zinc-500 disabled:opacity-20 p-1 flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+            {days.map((d, i) => {
+              const isToday = d.toDateString() === today.toDateString()
+              const isActive = d.toDateString() === activeDay.toDateString()
+              const dayIndex = d.getDay()
+              const shortLabel = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'][dayIndex]
+              return (
+                <button key={i} onClick={() => setSelectedDay(d)}
+                  className={`flex-shrink-0 flex flex-col items-center px-2.5 py-2 rounded-xl transition-colors ${
+                    isActive ? 'bg-amber-400 text-zinc-950' :
+                    isToday ? 'bg-zinc-800 text-amber-400 border border-amber-400/30' :
+                    'bg-zinc-800 text-zinc-400'
+                  }`}>
+                  <span className="text-[10px] font-medium">{shortLabel}</span>
+                  <span className="text-sm font-bold">{d.getDate()}</span>
+                  {hasMealsOnDay(d) && (
+                    <div className={`w-1 h-1 rounded-full mt-0.5 ${isActive ? 'bg-zinc-950' : 'bg-amber-400'}`} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => { setDayOffset(o => o + 10); setSelectedDay(null) }}
+            className="text-zinc-500 p-1 flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -380,7 +413,8 @@ export default function PlannerPage() {
       ) : (
         <div className="px-4 space-y-5 mt-2">
           <h2 className="text-base font-bold text-zinc-100">
-            {DAY_FULL[activeDay.getDay() === 0 ? 6 : activeDay.getDay() - 1]}
+            {['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'][activeDay.getDay()]}
+            {' '}<span className="font-normal text-zinc-500 text-sm">{activeDay.getDate()}/{activeDay.getMonth()+1}</span>
             {activeDay.toDateString() === today.toDateString() && (
               <span className="text-xs font-medium text-amber-400 ml-2">Oggi</span>
             )}
