@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+model FamilyMember {
+  id                    String   @id @default(cuid())
+  name                  String
+  type                  String
+  dietaryTags           String   @default("[]")
+  allowedIngredientIds  String   @default("[]")
+  excludedIngredientIds String   @default("[]")
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Ingredient {
+  id                  String    @id @default(cuid())
+  name                String
+  category            String
+  storageType         String
+  quantity            Float     @default(1)
+  unit                String    @default("pz")
+  purchaseDate        DateTime?
+  expiryDate          DateTime?
+  perishabilityScore  Int       @default(50)
+  status              String    @default("closed")
+  allowedMemberIds    String    @default("[]")
+  excludedMemberIds   String    @default("[]")
+  servingsAdults      Int       @default(2)
+  servingsChildren    Int       @default(2)
+  totalServings       Int       @default(0)
+  whoEatsIt           String    @default("[]")
+  consumeInOneSession Boolean   @default(false)
+  notes               String    @default("")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model MealOption {
+  id                    String   @id @default(cuid())
+  name                  String
+  mealType              String
+  compatibleMemberIds   String   @default("[]")
+  requiredIngredientIds String   @default("[]")
+  optionalIngredientIds String   @default("[]")
+  servingsAdults        Int      @default(2)
+  servingsChildren      Int      @default(2)
+  tags                  String   @default("[]")
+  canBeFrozen           Boolean  @default(false)
+  preparationNotes      String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model PlanningRule {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  label       String
+  value       String
+  scope       String   @default("always")
+  active      Boolean  @default(true)
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PlannedMeal {
+  id           String   @id @default(cuid())
+  date         DateTime
+  slot         String
+  memberGroup  String
+  mealOptionId String
+  overrides    String   @default("[]")
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SuggestionLog {
+  id                String   @id @default(cuid())
+  date              DateTime @default(now())
+  suggestionPayload String
+  accepted          Boolean  @default(false)
+  reason            String   @default("")
+}
