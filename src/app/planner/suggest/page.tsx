@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Ingredient, FamilyMember, PlanningRule } from '@/lib/types'
 
@@ -98,6 +98,19 @@ type Portata = typeof PORTATE[number]
 const PORTATA_LABEL: Record<Portata, string> = { primo: 'Primo', secondo: 'Secondo', contorno: 'Contorno' }
 
 export default function SuggestPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center gap-3 py-16">
+        <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-zinc-500">Carico…</p>
+      </div>
+    }>
+      <SuggestContent />
+    </Suspense>
+  )
+}
+
+function SuggestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date') ?? new Date().toISOString().split('T')[0]
